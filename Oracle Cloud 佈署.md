@@ -1,5 +1,4 @@
 # Oracle Cloud Always Free 佈署教學
-
 這份文件說明如何把目前的台股 RSS Discord Bot 佈署到 Oracle Cloud Always Free VM，並用 systemd 讓 Bot 開機自動啟動、異常自動重啟。
 
 適用情境：
@@ -170,30 +169,31 @@ python3 --version
 
 ### 方式 A：直接從 GitHub 下載
 
+#### Step 1：在 GitHub 上建立自己的 Repository
+
 如果你的專案已放到 GitHub：
 
 ```bash
 cd ~
-git clone https://github.com/tn00627974/Exercise.git
-cd RssNotityBot
+git clone https://github.com/tn00627974/rss-notify-bot
+cd rss-notify-bot
 ```
 
 如果你之後改了自己的 repo，請把網址換成你的實際 repository。
 
-### 方式 B：從本機上傳
+#### Step 2 : 使用 SCP 從本機上傳至 VM
 
 如果你不想用 GitHub，也可以用 SCP 或 VS Code Remote SSH 上傳整個專案資料夾到主機。
-
 Windows PowerShell 可直接使用 `scp`，例如：
 
 ```powershell
-scp -i $env:USERPROFILE\.ssh\id_ed25519 -r "D:\工程師資料夾\Exercise\Discord\RssNotityBot" ubuntu@你的_VM_Public_IP:~
+scp -i $env:USERPROFILE\.ssh\id_ed25519 -r "D:\工程師資料夾\rss-notify-bot" ubuntu@你的_VM_Public_IP:~
 ```
 
 如果你的 SSH 私鑰就是預設路徑，有時也可以省略 `-i`：
 
 ```powershell
-scp -r "D:\工程師資料夾\Exercise\Discord\RssNotityBot" ubuntu@你的_VM_Public_IP:~
+scp -r "D:\工程師資料夾\rss-notify-bot" ubuntu@你的_VM_Public_IP:~
 ```
 
 上傳完成後，再 SSH 進 VM：
@@ -205,196 +205,14 @@ ssh -i $env:USERPROFILE\.ssh\id_ed25519 ubuntu@你的_VM_Public_IP
 然後在 VM 內確認檔案：
 
 ```bash
-cd ~/RssNotityBot
+cd ~/rss-notify-bot
 ls -a
 ```
 
 注意：不要直接沿用從 Windows 上傳的 `.venv`。
 Windows 的虛擬環境通常會是 `.venv/Scripts` 和 `python.exe`，Ubuntu 不能直接使用，請在 Linux 主機上刪除後重建。
 
-上傳後請確定主程式位於：
-
-```bash
-~/RssNotityBot/bot.py
-```
-
-或其他你實際使用的路徑。
-
-### 方式 C：使用 Docker Compose 部署（容器化方案）
-
-環境完全隔離、與本地一致、依賴版本固定，是最推薦的長期維護方案。
-
-> 前置條件：VM 已建立、已 SSH 連進、已執行 `sudo apt update && sudo apt upgrade -y`
-
-#### Step 1：安裝 Docker 與 Docker Compose
-
-```bash
-# 安裝 Docker
-sudo apt update && sudo apt upgrade -y # 更新套件索引
-sudo apt install -y ca-certificates curl gnupg # 安裝必要的依賴
-
-# 新增 Docker 官方 GPG 金鑰
-sudo install -m 0755 -d /etc/apt/keyrings 
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
-
-# 設定 Docker 官方 Repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# 安裝 Docker 與 Docker Compose
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# 安裝之後驗證
-docker --version 
-docker compose version # V2版本，不用加-
-
-#### 啟動 Docker 服務
-sudo systemctl start docker
-
-#### 設定 Docker 開機自動啟動
-sudo systemctl enable docker
-
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-# 免 sudo 執行
-sudo usermod -aG docker $USER && newgrp docker
-```
-
-#### Step 2：複製專案
-
-**選項 A：GitHub**
-```bash
-cd ~ && git clone https://github.com/tn00627974/Exercise.git
-cd Exercise/Discord/RssNotityBot
-```
-
-**選項 B：本機 SCP 上傳**（Windows PowerShell）
-```powershell
-scp -i $env:USERPROFILE\.ssh\id_ed25519 -r "D:\工程師資料夾\Exercise\Discord\RssNotityBot" ubuntu@你的_VM_Public_IP:~/RssNotityBot
-```
-
-#### Step 3：建立 `.env` 環境變數
-
-```bash
-cd ~/RssNotityBot
-nano .env
-```
-
-填入內容後 `Ctrl+X` → `Y` → `Enter` 儲存：
-
-```env
-PORT=10000
-DISCORD_TOKEN=your_discord_token_here
-LINE_CHANNEL_ACCESS_TOKEN=your_line_token_here
-POSTGRES_USER=botuser
-POSTGRES_PASSWORD=your_secure_password_here
-POSTGRES_DB=botdb
-```
-
-#### Step 4：啟動並測試
-
-```bash
-# 啟動容器（背景執行）
-docker-compose up -d
-
-# 確認兩個容器都在運行
-docker-compose ps
-
-# 查看日誌，確認 Discord 連線成功後按 Ctrl+C 離開
-docker-compose logs -f bot
-```
-
-看到以下訊息表示正常：
-```text
-Health check server running on port 10000
-Shard ID None has connected to Gateway
-```
-
-#### Step 5：設定 systemd 開機自啟
-
-```bash
-sudo tee /etc/systemd/system/rss-notify-bot-docker.service > /dev/null << 'EOF'
-[Unit]
-Description=Discord RSS Bot (Docker Compose)
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/RssNotityBot
-ExecStart=/usr/bin/docker-compose up
-ExecStop=/usr/bin/docker-compose down
-Restart=unless-stopped
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable rss-notify-bot-docker
-sudo systemctl start rss-notify-bot-docker
-sudo systemctl status rss-notify-bot-docker
-```
-
-若路徑不是 `/home/ubuntu/RssNotityBot`，請修改 `WorkingDirectory`。
-
-#### 常用指令
-
-```bash
-sudo systemctl restart rss-notify-bot-docker   # 重啟
-sudo systemctl stop rss-notify-bot-docker      # 停止
-sudo journalctl -u rss-notify-bot-docker -f    # 即時日誌
-docker-compose logs -f bot                 # 容器日誌
-docker-compose exec bot bash               # 進入容器除錯
-```
-
-#### 更新程式
-
-```bash
-cd ~/RssNotityBot
-git pull                              # 拉取最新代碼
-docker-compose build                  # 重新構建映像
-sudo systemctl restart rss-notify-bot-docker
-```
-
-#### Step 10：更新程式
-
-若程式有更新，執行以下步驟：
-
-```bash
-cd ~/RssNotityBot
-
-# 如果是 GitHub clone，先拉取最新代碼
-git pull
-
-# 重新構建 Docker 映像
-docker-compose build
-
-# 重啟服務
-sudo systemctl restart rss-notify-bot-docker
-
-# 驗證更新
-docker-compose ps
-sudo journalctl -u rss-notify-bot-docker -n 50 --no-pager
-```
-
-#### 方式 C 優勢總結
-
-| 項目 | Python 直接運行 | Docker Compose |
-|---|---|---|
-| **環境隔離** | ❌ 可能衝突 | ✅ 完全隔離 |
-| **本地和雲端一致** | ⚠️ 需手動同步 | ✅ docker-compose.yml 同步 |
-| **資料庫管理** | ⚠️ 需額外安裝 | ✅ 容器內置 |
-| **版本控制** | ⚠️ 複雜 | ✅ 簡單 |
-| **水平擴展** | ❌ 困難 | ✅ 可輕鬆添加服務 |
-| **資源使用** | ✅ 最小 | ⚠️ 稍多 |
-
-**推薦場景：** 若你的 Bot 需要長期維護、可能擴展功能、希望與本地開發環境保持同步，**方式 C（Docker Compose）** 是最佳選擇。
-
----
-
-## 6. 建立虛擬環境並安裝依賴
+#### 建立虛擬環境並安裝依賴
 
 在專案目錄執行：
 
@@ -423,11 +241,11 @@ pip list
 
 ---
 
-## 7. 設定環境變數
+#### 設定環境變數
 
 你有兩種做法，推薦第 1 種。
 
-### 做法 1：使用 `.env` 檔案
+##### 做法 1：使用 `.env` 檔案
 
 在專案目錄建立 `.env`：
 
@@ -438,24 +256,22 @@ nano .env
 填入內容：
 
 ```env
-DISCORD_TOKEN=你的 Discord Bot Token
-CHANNEL_ID=你的 Discord 頻道 ID
-RSS_URL=https://tw.stock.yahoo.com/rss?category=tw-market
-MENTION_USER_ID=
-PORT=10000
-```
+# 平台服務設定
+DISCORD_TOKEN=
+LINE_CHANNEL_ACCESS_TOKEN=
+FEISHU_WEBHOOK_URL=
 
-如果你要多組訂閱，改成：
-
-```env
-DISCORD_TOKEN=你的 Discord Bot Token
+# 訂閱設定：指向外部 JSON 檔案（推薦，方便維護）
+# 格式請參考 subscriptions.json
 SUBSCRIPTIONS_FILE=subscriptions.json
-PORT=10000
+
+# 其他設定
+PORT=10001
 ```
 
 這個專案已內建 `load_dotenv()`，因此直接放 `.env` 就能被讀取。
 
-### 做法 2：systemd 使用獨立環境檔
+##### 做法 2：systemd 使用獨立環境檔
 
 如果你不想把敏感資訊放在專案資料夾，可改放到：
 
@@ -466,16 +282,24 @@ sudo nano /etc/rss-notify-bot.env
 內容範例：
 
 ```env
-DISCORD_TOKEN=你的 Discord Bot Token
+# 平台服務設定
+DISCORD_TOKEN=
+LINE_CHANNEL_ACCESS_TOKEN=
+FEISHU_WEBHOOK_URL=
+
+# 訂閱設定：指向外部 JSON 檔案（推薦，方便維護）
+# 格式請參考 subscriptions.json
 SUBSCRIPTIONS_FILE=subscriptions.json
-PORT=10000
+
+# 其他設定
+PORT=10001
 ```
 
 如果你使用這種方式，稍後的 systemd service 要用 `EnvironmentFile=` 指向這個檔案。
 
----
+---s
 
-## 8. 先手動測試 Bot 是否可正常啟動
+#### 先手動測試 Bot 是否可正常啟動
 
 在專案目錄執行：
 
@@ -497,21 +321,13 @@ python bot.py --test "Oracle Cloud 部署測試成功"
 python bot.py
 ```
 
-看到類似以下訊息表示正常：
-
-```text
-[INFO] Health check server running on port 10000
-[INFO] Primed 50 items from RSS
-[INFO] Shard ID None has connected to Gateway
-```
-
 確認正常後，按 `Ctrl + C` 停掉，接著再做 systemd 常駐。
 
 ---
 
-## 9. 設定 systemd 讓 Bot 常駐執行
+#### 設定 systemd 讓 Bot 常駐執行
 
-### 9.1 建立 service 檔
+### 建立 service 檔
 
 ```bash
 sudo nano /etc/systemd/system/rss-notify-bot.service
@@ -521,15 +337,15 @@ sudo nano /etc/systemd/system/rss-notify-bot.service
 
 ```ini
 [Unit]
-Description=Discord RSS Bot
+Description=RSS Notify Bot
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/RssNotityBot
-ExecStart=/home/ubuntu/RssNotityBot/.venv/bin/python bot.py
+WorkingDirectory=/home/ubuntu/rss-notify-bot
+ExecStart=/home/ubuntu/rss-notify-bot/.venv/bin/python bot.py
 Restart=always
 RestartSec=10
 
@@ -540,9 +356,9 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-如果你的專案不是放在 `/home/ubuntu/RssNotityBot`，請改成你的實際路徑。
+如果你的專案不是放在 `/home/ubuntu/rss-notify-bot`，請改成你的實際路徑。
 
-### 9.2 重新載入並啟用服務
+### 重新載入並啟用服務
 
 ```bash
 sudo systemctl daemon-reload # 重新讀設定
@@ -550,17 +366,15 @@ sudo systemctl enable rss-notify-bot # 開機自動啟動
 sudo systemctl start rss-notify-bot # 立刻啟動
 ```
 
-### 9.3 檢查服務狀態
+### 檢查服務狀態
 
 ```bash
-sudo systemctl status rss-notify-bot # 檢查服務
+sudo systemctl status rss-notify-bot # 檢查服務 ( 若看到 `active (running)` 就代表已成功常駐 )
 ```
-
-若看到 `active (running)` 就代表已成功常駐。
 
 ---
 
-## 10. 查看執行日誌
+#### 查看執行日誌
 
 即時查看日誌：
 
@@ -574,17 +388,9 @@ sudo journalctl -u rss-notify-bot -f
 sudo journalctl -u rss-notify-bot -n 100 --no-pager
 ```
 
-正常情況下，應能看到：
-
-```text
-Health check server running on port 10000
-Primed 50 items from RSS
-Shard ID None has connected to Gateway
-```
-
 ---
 
-## 11. 開機自動啟動與重啟管理
+### 開機自動啟動與重啟管理
 
 常用指令如下：
 
@@ -595,17 +401,191 @@ sudo systemctl start rss-notify-bot
 sudo systemctl status rss-notify-bot
 ```
 
-因為 service 設定了：
+#### 之後如何更新程式
 
-```ini
-Restart=always
+如果你是用 GitHub clone：
+
+```bash
+cd ~/rss-notify-bot
+git pull
+source .venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart rss-notify-bot
 ```
 
-所以程式異常退出時，systemd 會自動重啟。
+更新後再檢查：
+
+```bash
+sudo systemctl status rss-notify-bot
+sudo journalctl -u rss-notify-bot -n 50 --no-pager
+```
 
 ---
 
-## 12. Oracle Cloud 網路與防火牆建議
+### 方式 B：使用 Docker Compose 部署（容器化方案）
+
+環境完全隔離、與本地一致、依賴版本固定，是最推薦的長期維護方案。
+
+> 前置條件：VM 已建立、已 SSH 連進、已執行 `sudo apt update && sudo apt upgrade -y`
+
+#### Step 1：安裝 Docker 與 Docker Compose
+
+```bash
+# 安裝 Docker
+sudo apt update && sudo apt upgrade -y # 更新套件索引
+sudo apt install -y ca-certificates curl gnupg # 安裝必要的依賴
+
+# 新增 Docker 官方 GPG 金鑰
+sudo install -m 0755 -d /etc/apt/keyrings # 0755 = 目錄可讀可執行
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
+
+# 設定 Docker 官方 Repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 更新套件索引（必須）
+sudo apt update
+
+# 安裝 Docker 與 Docker Compose
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 安裝之後驗證
+docker --version # echo > Docker version 29.4.2, build 055a478
+docker compose version # V2版本，不用加- # echo > Docker Compose version v5.1.3
+
+#### Docker 服務
+sudo systemctl start docker # 啟動
+sudo systemctl enable docker # 開機自動啟動
+sudo systemctl status docker # 檢查是否有啟動(active:running) 
+ 
+#### (所有人)可以讀取 Docker 的金鑰檔案
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# 免 sudo 執行
+sudo usermod -aG docker $USER && newgrp docker
+```
+ 
+#### Step 2：Git Clone 專案
+
+**拉取 GitHub**
+```bash
+cd ~ && git clone https://github.com/tn00627974/rss-notify-bot
+cd rss-notify-bot
+```
+
+#### Step 3：建立 `.env` 環境變數
+
+```bash
+cd ~/RssNotityBot
+nano .env.example
+```
+
+填入內容後 `Ctrl+X` → `Y` → `Enter` 儲存：
+
+```env
+# 平台服務設定
+DISCORD_TOKEN=
+LINE_CHANNEL_ACCESS_TOKEN=
+FEISHU_WEBHOOK_URL=
+
+# 訂閱設定：指向外部 JSON 檔案（推薦，方便維護）
+# 格式請參考 subscriptions.json
+SUBSCRIPTIONS_FILE=subscriptions.json
+
+# 其他設定
+PORT=10001
+```
+
+將 `simple` 複製一份並命名`.env `
+```bash
+cp .env.simple .env
+```
+
+#### Step 4：啟動並測試
+- 需先cd 到專案資料夾，才能執行 docker compose 指令
+
+```bash
+# 啟動容器（背景執行）
+docker compose up -d
+
+# 確認兩個容器都在運行
+docker compose ps
+
+# 查看日誌，確認 Discord 連線成功後按 Ctrl+C 離開
+docker compose logs -f bot
+
+# 進入容器內部測試
+docker compose exec bot bash
+```
+
+#### Step 5：設定 systemd 開機自啟
+
+```bash
+sudo tee /etc/systemd/system/rss-notify-bot-docker.service > /dev/null << 'EOF'
+[Unit]
+Description=RSS Notify Bot (Docker Compose)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/rss-notify-bot
+ExecStart=/usr/bin/docker compose up
+ExecStop=/usr/bin/docker compose down
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload # 重新讀設定
+sudo systemctl enable rss-notify-bot-docker # 開機自動啟動
+sudo systemctl start rss-notify-bot-docker  # 立刻啟動
+sudo systemctl status rss-notify-bot-docker # 檢查服務狀態 (active:running)
+```
+
+若路徑不是 `/home/ubuntu/RssNotityBot`，請修改 `WorkingDirectory`。
+
+#### 常用指令
+
+```bash
+sudo systemctl restart rss-notify-bot-docker   # 重啟
+sudo systemctl stop rss-notify-bot-docker      # 停止
+sudo journalctl -u rss-notify-bot-docker -f    # 即時日誌
+docker-compose logs -f bot                 # 容器日誌
+docker-compose exec bot bash               # 進入容器除錯
+```
+
+#### Docker Compose 方式如何更新程式 ?
+
+若程式有更新，執行以下步驟：
+
+```bash
+cd ~/rss-notify-bot
+git pull # 如果是 GitHub clone，先拉取最新代碼
+docker compose build # 重新構建 Docker 映像
+sudo systemctl restart rss-notify-bot-docker # 重啟服務
+docker compose ps # 確認容器重啟成功
+sudo journalctl -u rss-notify-bot-docker -n 50 --no-pager # 查看最新日誌
+```
+
+#### 方式 C 優勢總結
+
+| 項目 | Python 直接運行 | Docker Compose |
+|---|---|---|
+| **環境隔離** | ❌ 可能衝突 | ✅ 完全隔離 |
+| **本地和雲端一致** | ⚠️ 需手動同步 | ✅ docker-compose.yml 同步 |
+| **資料庫管理** | ⚠️ 需額外安裝 | ✅ 容器內置 |
+| **版本控制** | ⚠️ 複雜 | ✅ 簡單 |
+| **水平擴展** | ❌ 困難 | ✅ 可輕鬆添加服務 |
+| **資源使用** | ✅ 最小 | ⚠️ 稍多 |
+
+**推薦場景：** 若你的 Bot 需要長期維護、可能擴展功能、希望與本地開發環境保持同步，**方式 C（Docker Compose）** 是最佳選擇。
+
+---
+
+## Oracle Cloud 網路與防火牆建議
 
 這個 Bot 的主要用途是主動連出到 Discord 與 RSS，不一定需要對外開放 HTTP 服務。
 
@@ -635,28 +615,7 @@ sudo ufw status
 
 ---
 
-## 13. 之後如何更新程式
-
-如果你是用 GitHub clone：
-
-```bash
-cd ~/Exercise/Discord/RssNotityBot
-git pull
-source .venv/bin/activate
-pip install -r requirements.txt
-sudo systemctl restart rss-notify-bot
-```
-
-更新後再檢查：
-
-```bash
-sudo systemctl status rss-notify-bot
-sudo journalctl -u rss-notify-bot -n 50 --no-pager
-```
-
----
-
-## 14. 常見問題排查
+## 常見問題排查
 
 ### 1. `Missing environment variable: DISCORD_TOKEN`
 
@@ -708,7 +667,7 @@ sudo systemctl enable rss-notify-bot
 
 ---
 
-## 15. 建議的最終目錄結構
+## 建議的最終目錄結構
 
 ```text
 /home/ubuntu/Exercise/Discord/RssNotityBot
@@ -721,32 +680,8 @@ sudo systemctl enable rss-notify-bot
 
 ---
 
-## 16. 最短部署流程總結
 
-如果你要快速照做，最短流程如下：
-
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3 python3-venv python3-pip git
-cd ~
-git clone https://github.com/tn00627974/Exercise.git
-cd Exercise/Discord/RssNotityBot
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-nano .env
-python bot.py --test "Oracle Cloud 部署測試成功"
-sudo nano /etc/systemd/system/rss-notify-bot.service
-sudo systemctl daemon-reload
-sudo systemctl enable rss-notify-bot
-sudo systemctl start rss-notify-bot
-sudo journalctl -u rss-notify-bot -f
-```
-
----
-
-## 17. 補充建議
+## 補充建議
 
 - Oracle Always Free 不會像部分免費平台一樣自動休眠，適合這種長駐 Bot。
 - 建議定期執行 `sudo apt update && sudo apt upgrade -y` 做安全更新。
