@@ -237,7 +237,7 @@ class TestDiscordPush(unittest.IsolatedAsyncioTestCase):
         notifier, channel = self._make()
         notifier._mention_map["42"] = 123
         await notifier._push("42", "Hello")
-        channel.send.assert_called_once_with("<@123> Hello")
+        channel.send.assert_called_once_with("<@123> \n Hello")
 
     async def test_channel_cached_after_first_fetch(self):
         notifier, channel = self._make()
