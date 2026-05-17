@@ -119,7 +119,9 @@ One JSON `rss_url` item with N `targets[]` entries produces N `Subscription` obj
 
 ---
 
-## 5. subscriptions.json Schema
+## 5. Schema (select json example + database schema)
+
+### subscriptions.json 
 
 ```json
 [
@@ -142,6 +144,23 @@ Supported `platform` aliases:
 | `discord`, `dc` | `discord` |
 | `line`, `linebot`, `line-bot` | `line` |
 | `feishu`, `lark` | `feishu` |
+
+### Database Schema (PostgreSQL)
+
+File: [`db/schema.sql`](../../../db/schema.sql)
+Context: [db/schema.sql](../../../db/schema.sql)
+
+```sql
+
+### 四張核心表
+
+| 表 | 說明 |
+|---|---|
+| `rss_source` | RSS 訂閱來源（rss_url、display_name） |
+| `platform` | 平台種類（discord、line） |
+| `target` | 推播目標（platform_id、external_id = DC頻道ID 或 LINE群組ID） |
+| `rss_source_target` | M:N 橋接表，rss_source ↔ target |
+
 
 ---
 

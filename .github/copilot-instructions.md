@@ -46,6 +46,9 @@ DcBot/
 
 ```
 
+## 資料庫結構
+詳見 `db/schema.sql`，使用 PostgreSQL，核心為 rss_source / platform / target / rss_source_target 四張表。
+
 ---
 
 ## SRP 分層架構（bot.py）
