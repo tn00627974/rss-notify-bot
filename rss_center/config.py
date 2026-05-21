@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import asyncpg
 from typing import Any, Dict, List, Optional
 
 from .models import Subscription
@@ -14,6 +15,60 @@ def get_env_var(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing environment variable: {name}")
     return value
+
+
+async def load_subscriptions_from_db(dsn: str) -> List[Subscription]:
+    """從資料庫載入訂閱設定。"""
+    # 這裡的實作會依據實際使用的資料庫而有所不同。
+    # 以下是一個假設性的範例，請根據你的資料庫結構進行調整。
+    conn = await asyncpg.connect(dsn)
+    query = """
+    SELECT rs.rss_url, rs.display_name, p.name AS platform,
+            t.external_id, t.mention_user_id
+        FROM rss_source_target rst
+        JOIN rss_source rs ON rs.id = rst.rss_source_id
+        JOIN target     t  ON t.id  = rst.target_id
+        JOIN platform   p  ON p.id  = t.platform_id
+        WHERE rs.is_active = TRUE
+    """
+    rows = await conn.fetch(query)
+    subscriptions: List[Subscription] = []
+
+    for row in rows:
+        platform = normalize_platform(row["platform"])
+        channel_id = None  # Discord
+        mention_user_id = None  # Discord 的 @名字功能
+        target_id = None  # Line
+        webhook_url = None  # Feishu
+
+        # 根據平台類型解析對應的欄位
+        if platform == "discord":
+            channel_id = _to_optional_int(row["external_id"])
+            mention_user_id = _to_optional_int(row["mention_user_id"])
+        elif platform == "line":
+            target_id = row["external_id"]
+        elif platform == "feishu":
+            webhook_url = row["external_id"]
+
+        subscriptions.append(
+            Subscription(
+                rss_url=row["rss_url"],
+                display_name=row["display_name"],
+                platform=row["platform"],
+                channel_id=channel_id,
+                mention_user_id=mention_user_id,
+                target_id=target_id,
+                webhook_url=webhook_url,
+                extra={},
+            )
+        )
+    await conn.close()
+
+    if not subscriptions:
+        raise RuntimeError("沒有任何有效訂閱，請檢查資料庫中的 subscriptions 表")
+
+    logging.info("從資料庫 %s 載入 %d 筆通知目標", subscriptions, len(subscriptions))
+    return subscriptions
 
 
 def _to_optional_int(value: Any) -> Optional[int]:

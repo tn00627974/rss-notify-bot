@@ -26,7 +26,11 @@ from rss_center.batch_notifier import (
     LineBatchNotifier,
     FeishuBatchNotifier,
 )
-from rss_center.config import get_env_var, load_subscriptions
+from rss_center.config import (
+    get_env_var,
+    load_subscriptions,
+    load_subscriptions_from_db,
+)
 from rss_center.notifiers import NotificationRouter
 from rss_center.service import RssPollingService
 
@@ -113,7 +117,11 @@ async def _async_main(
     test_line: str | None,
 ) -> None:
     """非同步主函數：組裝 SRP 分層元件並執行。"""
-    subscriptions = load_subscriptions(get_env_var("SUBSCRIPTIONS_FILE"))
+    data_source = os.getenv("SUBSCRIPTIONS_SOURCE", "json").strip().lower()
+    if data_source == "pgsql":
+        subscriptions = await load_subscriptions_from_db(get_env_var("DATABASE_URL"))
+    else:
+        subscriptions = load_subscriptions(get_env_var("SUBSCRIPTIONS_FILE"))
 
     async with aiohttp.ClientSession() as session:
         client = SubscriptionCenterBot(
