@@ -564,7 +564,7 @@ docker-compose exec bot bash               # 進入容器除錯
 ```bash
 cd ~/rss-notify-bot
 git pull # 如果是 GitHub clone，先拉取最新代碼
-docker compose build # 重新構建 Docker 映像
+docker compose build # 只重建 image，不重啟容器（容器仍跑舊的）
 sudo systemctl restart rss-notify-bot-docker # 重啟服務
 docker compose ps # 確認容器重啟成功
 sudo journalctl -u rss-notify-bot-docker -n 50 --no-pager # 查看最新日誌

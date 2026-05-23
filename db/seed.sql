@@ -19,15 +19,13 @@ VALUES
 
 INSERT INTO target (platform_id, external_id, mention_user_id, description) 
 VALUES
-(1, '1471437966114291795', '401030097093525514', 'Dc:台股動態', NULL),
-(1, '1478028289862930576', '401030097093525514', 'Dc:小資理財', NULL),
+(1, '1471437966114291795', '401030097093525514', 'Dc:台股動態'),
+(1, '1478028289862930576', '401030097093525514', 'Dc:小資理財'),
 (1, '1479863790156648590', NULL, 'Dc:RO世界-Yt影片'),
-(1, '1507638723997860031', '401030097093525514', 'Dc:資訊日報', NULL)
-
-INSERT INTO target (platform_id, external_id, mention_user_id, description)
-VALUES
 (2, 'Ca3e813c39a0091749eaac4c6c63641e8', NULL, 'Group:阿母股票'),
-(2, 'Cc36965bdf5691eb6e774add9ba663513', NULL, 'Group:Youtube 通知快訊');
+(2, 'Cc36965bdf5691eb6e774add9ba663513', NULL, 'Group:Youtube 通知快訊'),
+(1, '1507638723997860031', '401030097093525514', 'Dc:資訊日報');
+
 
 INSERT INTO rss_source_target (rss_source_id, target_id)
 VALUES
