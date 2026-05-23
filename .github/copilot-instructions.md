@@ -9,8 +9,9 @@
 ## 專案資料結構
 
 ```
-DcBot/
+RssNotityBot/
 ├── bot.py                                     # 程式唯一入口，負責啟動生命週期
+├── conftest.py                                # pytest 共用 fixtures
 ├── line_userid_webhook.py                     # 工具：取得 LINE User ID 的 Webhook
 ├── requirements.txt                           # Python 套件依賴
 ├── subscriptions.json                         # 訂閱設定（正式使用）
@@ -23,20 +24,24 @@ DcBot/
 ├── rss_center/                                # 核心業務邏輯（SRP 分層）
 │   ├── __init__.py
 │   ├── models.py          # 資料結構：Subscription dataclass
-│   ├── config.py          # 設定載入：env var、subscriptions.json 解析
+│   ├── config.py          # 設定載入：env var、subscriptions.json / PostgreSQL 解析
 │   ├── formatters.py      # 訊息格式化：RSS 條目 → 文字訊息
-│   ├── notifiers.py       # 通知發送：Discord / LINE / 飛書
+│   ├── notifiers.py       # 通知發送基底：BaseNotifier、NotificationRouter
 │   ├── batch_queue.py     # 批量隊列：數量/超時雙觸發，純邏輯無 I/O
-│   ├── batch_notifier.py  # 批量通知器：BaseBatchNotifier，合併多條為單次 API 呼叫
+│   ├── batch_notifier.py  # 批量通知器：BaseBatchNotifier 及各平台子類別
 │   └── service.py         # RSS 輪詢服務：去重、分派
 │
-├── test/                           # 單元與整合測試
+├── db/
+│   ├── schema.sql         # PostgreSQL 資料表定義
+│   └── seed.sql           # 初始資料
+│
+├── tests/                          # 單元與整合測試
 │   ├── test_bot_cli.py             # CLI 引數解析測試
 │   ├── test_rss.py                 # RSS 解析測試
 │   ├── test_subscriptions.py       # subscriptions.json 載入測試
 │   ├── test_subscription_center.py # 訂閱中心整合測試
-│   └── test_line_userid_webhook.py # LINE Webhook 測試
-|   └── test_batch_notifier.py      # 批量通知器測試 
+│   ├── test_line_userid_webhook.py # LINE Webhook 測試
+│   └── test_batch_notifier.py      # 批量通知器測試
 │
 ├── .github/
 │   ├── copilot-instructions.md     # AI Agent 指引（本檔）
@@ -68,11 +73,11 @@ DcBot/
 | 模組 | 單一職責 |
 |---|---|
 | `models.py` | `Subscription` dataclass 定義 |
-| `config.py` | `get_env_var()`、`load_subscriptions()`、`normalize_platform()` |
+| `config.py` | `get_env_var()`、`load_subscriptions()`、`load_subscriptions_from_db()`、`normalize_platform()` |
 | `formatters.py` | `format_feed_message()`、`format_discord_message()` |
-| `notifiers.py` | `DiscordNotifier`、`LineNotifier`、`FeishuNotifier`、`NotificationRouter` |
+| `notifiers.py` | `BaseNotifier`、`NotificationRouter` |
 | `batch_queue.py` | `BatchQueue`、`BatchQueueManager`：隊列管理與雙觸發條件（數量/超時） |
-| `batch_notifier.py` | `BaseBatchNotifier`：批量推送基底，合併訊息為單次 API 呼叫 |
+| `batch_notifier.py` | `BaseBatchNotifier`（抽象基底）、`DiscordBatchNotifier`、`LineBatchNotifier`、`FeishuBatchNotifier` |
 | `service.py` | `RssPollingService`：輪詢、去重、通知分派 |
 
 ---
@@ -82,7 +87,9 @@ DcBot/
 | 變數名稱 | 說明 | 必填 |
 |---|---|---|
 | `DISCORD_TOKEN` | Discord Bot Token | ✅ |
-| `SUBSCRIPTIONS_FILE` | 訂閱設定 JSON 路徑，預設 `subscriptions.json` | ✅ |
+| `SUBSCRIPTIONS_FILE` | 訂閱設定 JSON 路徑，預設 `subscriptions.json` | JSON 模式必填 |
+| `SUBSCRIPTIONS_SOURCE` | 資料來源模式：`json`（預設）或 `pgsql` | 否 |
+| `DATABASE_URL` | PostgreSQL 連線字串（DSN） | pgsql 模式必填 |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API Channel Access Token | LINE 平台必填 |
 | `FEISHU_WEBHOOK_URL` | 飛書 Webhook URL（全域預設） | 飛書平台必填 |
 | `PORT` | HTTP 健康檢查埠號，預設 `10000` | Render 必填 |
@@ -136,10 +143,12 @@ python -m pytest tests/
 ## Python 套件依賴
 
 ```
-discord.py==2.4.0
+discord.py==2.5.0
 feedparser==6.0.11
 python-dotenv==1.0.1
-aiohttp==3.11.18
+aiohttp==3.13.5
+pytest==9.0.3
+asyncpg==0.30.0
 ```
 
 ---

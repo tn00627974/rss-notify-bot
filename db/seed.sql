@@ -14,20 +14,20 @@ VALUES
 ('https://www.youtube.com/feeds/videos.xml?channel_id=UCpmszDgk135POU3WxpdVt1g', '阿瑞斯Ares'),
 ('https://www.youtube.com/feeds/videos.xml?channel_id=UC_IaXjkXABqXjLjiIHDJPqw', '微笑'),
 ('https://www.youtube.com/feeds/videos.xml?channel_id=UC_XZ4O10pZq9RCigggGSB1A', 'CD喜德'),
-('https://www.youtube.com/feeds/videos.xml?channel_id=UCjCSgRei43lOxiTwpQakXVg', '三叔公');
+('https://www.youtube.com/feeds/videos.xml?channel_id=UCjCSgRei43lOxiTwpQakXVg', '三叔公'),
+('https://www.ithome.com.tw/rss', 'IThome新聞');
 
--- external_id : ( external_id =  dc的頻道id or line群組id )
--- mention_user_id : dc用的 @帳號名字 (例如 : @紅月)
-INSERT INTO target (platform_id, external_id, mention_user_id, description)
+INSERT INTO target (platform_id, external_id, mention_user_id, description) 
 VALUES
-(1, '1471437966114291795', '401030097093525514', NULL),
-(1, '1478028289862930576', '401030097093525514', NULL),
-(1, '1479863790156648590', NULL, NULL);
+(1, '1471437966114291795', '401030097093525514', 'Dc:台股動態', NULL),
+(1, '1478028289862930576', '401030097093525514', 'Dc:小資理財', NULL),
+(1, '1479863790156648590', NULL, 'Dc:RO世界-Yt影片'),
+(1, '1507638723997860031', '401030097093525514', 'Dc:資訊日報', NULL)
 
 INSERT INTO target (platform_id, external_id, mention_user_id, description)
 VALUES
 (2, 'Ca3e813c39a0091749eaac4c6c63641e8', NULL, 'Group:阿母股票'),
-(2, 'Cc36965bdf5691eb6e774add9ba663513', NULL, 'Group:Youtube 通知快訊'),
+(2, 'Cc36965bdf5691eb6e774add9ba663513', NULL, 'Group:Youtube 通知快訊');
 
 INSERT INTO rss_source_target (rss_source_id, target_id)
 VALUES
@@ -69,4 +69,7 @@ VALUES
 
 -- 三叔公
 (10, 3),
-(10, 5);
+(10, 5),
+
+-- 資訊日報
+(11, 6);
