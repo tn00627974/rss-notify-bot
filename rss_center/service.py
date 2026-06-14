@@ -114,6 +114,7 @@ class RssPollingService:
                 await self._notify_subscription(sub, entry, feed.feed)
 
     async def _notify_subscription(self, sub: Subscription, entry, feed_info) -> None:
+        """格式化訊息並透過路由器發送，例外只記錄不拋出（避免中斷輪詢邏輯）。"""
         content = format_feed_message(sub, entry, feed_info)
         await self.router.send(sub, content)
         title = getattr(entry, "title", "(no title)")
