@@ -150,5 +150,27 @@
                 "_description": "Group:Youtube 通知快訊"
             }
         ]
+    },
+    {
+        "rss_url": "https://www.ithome.com.tw/rss",
+        "display_name": "IThome新聞",
+        "targets": [
+            {
+                "platform": "discord",
+                "channel_id": 1507638723997860031,
+                "mention_user_id": 401030097093525514
+            }
+        ]
+    },
+    {
+        "rss_url": "https://gnn.gamer.com.tw/rss.xml",
+        "display_name": "巴哈GNN新聞",
+        "targets": [
+            {
+                "platform": "discord",
+                "channel_id": 1515664203497607319,
+                "mention_user_id": 401030097093525514
+            }
+        ]
     }
 ]

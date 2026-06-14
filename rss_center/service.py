@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, List, Set
+from typing import Awaitable, Callable, Dict, List, Optional, Set
 
 import feedparser
 
@@ -20,12 +20,16 @@ class RssPollingService:
     )
 
     def __init__(
-        self, subscriptions: List[Subscription], router: NotificationRouter
+        self,
+        subscriptions: List[Subscription],
+        router: NotificationRouter,
+        reload_fn: Optional[Callable[[], Awaitable[List[Subscription]]]] = None,
     ) -> None:
         self.subscriptions = subscriptions
         self.router = router
         self.subscriptions_by_feed = self._group_subscriptions_by_feed(subscriptions)
         self.seen_ids_map: Dict[str, Set[str]] = {}
+        self._reload_fn = reload_fn
 
     @staticmethod
     def _group_subscriptions_by_feed(
@@ -51,6 +55,7 @@ class RssPollingService:
     async def poll_loop(self, poll_interval_seconds: int) -> None:
         """持續輪詢所有 RSS 來源。"""
         while True:
+            await self._reload_subscriptions()  # 每輪開始前重新更新訂閱清單(同步DB變更)
             for rss_url in self.subscriptions_by_feed:
                 try:
                     await self.poll_once_for_feed(rss_url)
@@ -109,10 +114,37 @@ class RssPollingService:
                 await self._notify_subscription(sub, entry, feed.feed)
 
     async def _notify_subscription(self, sub: Subscription, entry, feed_info) -> None:
+        """格式化訊息並透過路由器發送，例外只記錄不拋出（避免中斷輪詢邏輯）。"""
         content = format_feed_message(sub, entry, feed_info)
         await self.router.send(sub, content)
         title = getattr(entry, "title", "(no title)")
         logging.info("Posted to %s: %s", sub.platform, title)
+
+    async def _reload_subscriptions(self) -> None:
+        """重新載入訂閱清單，並更新內部狀態。"""
+        if self._reload_fn is None:
+            return
+
+        # reload_fn 會回傳完整的訂閱清單，包含新增與刪除
+        try:
+            new_subs = await self._reload_fn()
+            new_grouped = self._group_subscriptions_by_feed(new_subs)  # 重新分組
+            new_urls = set(new_grouped) - set(self.seen_ids_map)  # 找出新增的 RSS URL
+            for rss_url in new_urls:
+                feed = feedparser.parse(rss_url, agent=self._FEEDPARSER_AGENT)
+                self.seen_ids_map[rss_url] = {
+                    self._entry_id(e) for e in feed.entries if self._entry_id(e)
+                }
+                logging.info(
+                    "新增訂閱，預載 %d 筆已讀: %s",
+                    len(self.seen_ids_map[rss_url]),
+                    rss_url,
+                )
+            self.subscriptions = new_subs
+            self.subscriptions_by_feed = new_grouped
+        except Exception as exc:
+            logging.warning("重載訂閱失敗，沿用舊設定: %s", exc)
+            return
 
     @staticmethod
     def _entry_id(entry) -> str:

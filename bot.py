@@ -13,7 +13,7 @@ import contextlib
 import logging
 import os
 import time
-from typing import Dict, Optional
+from typing import Awaitable, Callable, Dict, List, Optional
 
 import aiohttp
 import discord
@@ -27,6 +27,7 @@ from rss_center.batch_notifier import (
     FeishuBatchNotifier,
 )
 from rss_center.config import (
+    Subscription,
     get_env_var,
     load_subscriptions,
     load_subscriptions_from_db,
@@ -118,10 +119,14 @@ async def _async_main(
 ) -> None:
     """非同步主函數：組裝 SRP 分層元件並執行。"""
     data_source = os.getenv("SUBSCRIPTIONS_SOURCE", "json").strip().lower()
-    if data_source == "pgsql":
-        subscriptions = await load_subscriptions_from_db(get_env_var("DATABASE_URL"))
-    else:
-        subscriptions = load_subscriptions(get_env_var("SUBSCRIPTIONS_FILE"))
+
+    async def load_subscriptions_by_source() -> List[Subscription]:
+        if data_source == "pgsql":
+            return await load_subscriptions_from_db(get_env_var("DATABASE_URL"))
+        else:
+            return load_subscriptions(get_env_var("SUBSCRIPTIONS_FILE"))
+
+    subscriptions = await load_subscriptions_by_source()  # 預先呼叫一次以確保連線正常
 
     async with aiohttp.ClientSession() as session:
         client = SubscriptionCenterBot(
@@ -146,7 +151,11 @@ async def _async_main(
                 "feishu": feishu_notifier,
             }
         )
-        client.set_service(RssPollingService(subscriptions, router))
+        client.set_service(
+            RssPollingService(
+                subscriptions, router, reload_fn=load_subscriptions_by_source
+            )
+        )
 
         if test_message or test_yt or test_line:
             async with client:

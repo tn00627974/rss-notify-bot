@@ -15,7 +15,8 @@ VALUES
 ('https://www.youtube.com/feeds/videos.xml?channel_id=UC_IaXjkXABqXjLjiIHDJPqw', '微笑'),
 ('https://www.youtube.com/feeds/videos.xml?channel_id=UC_XZ4O10pZq9RCigggGSB1A', 'CD喜德'),
 ('https://www.youtube.com/feeds/videos.xml?channel_id=UCjCSgRei43lOxiTwpQakXVg', '三叔公'),
-('https://www.ithome.com.tw/rss', 'IThome新聞');
+('https://www.ithome.com.tw/rss', 'IThome新聞'),
+('https://gnn.gamer.com.tw/rss.xml', '巴哈GNN新聞');
 
 INSERT INTO target (platform_id, external_id, mention_user_id, description) 
 VALUES
@@ -24,8 +25,8 @@ VALUES
 (1, '1479863790156648590', NULL, 'Dc:RO世界-Yt影片'),
 (2, 'Ca3e813c39a0091749eaac4c6c63641e8', NULL, 'Group:阿母股票'),
 (2, 'Cc36965bdf5691eb6e774add9ba663513', NULL, 'Group:Youtube 通知快訊'),
-(1, '1507638723997860031', '401030097093525514', 'Dc:資訊日報');
-
+(1, '1507638723997860031', '401030097093525514', 'Dc:資訊日報'),
+(1, '1515664203497607319', '401030097093525514', 'Dc:巴哈遊戲新聞');
 
 INSERT INTO rss_source_target (rss_source_id, target_id)
 VALUES
@@ -71,3 +72,6 @@ VALUES
 
 -- 資訊日報
 (11, 6);
+
+-- 巴哈遊戲新聞
+(12, 7);
