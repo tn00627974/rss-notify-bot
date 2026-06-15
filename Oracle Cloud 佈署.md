@@ -422,9 +422,9 @@ sudo journalctl -u rss-notify-bot -n 50 --no-pager
 
 ---
 
-### 方式 B：使用 Docker Compose 部署（容器化方案）
+### 方式 B：使用 Docker Compose 部署（容器化方案 + PostgreSQL）
 
-環境完全隔離、與本地一致、依賴版本固定，是最推薦的長期維護方案。
+環境完全隔離、與本地一致、依賴版本固定、資料庫自動初始化，是最推薦的長期維護方案。
 
 > 前置條件：VM 已建立、已 SSH 連進、已執行 `sudo apt update && sudo apt upgrade -y`
 
@@ -455,7 +455,7 @@ docker compose version # V2版本，不用加- # echo > Docker Compose version v
 #### Docker 服務
 sudo systemctl start docker # 啟動
 sudo systemctl enable docker # 開機自動啟動
-sudo systemctl status docker # 檢查是否有啟動(active:running) 
+sudo systemctl status docker # 檢查狀態 (active:running)
  
 #### (所有人)可以讀取 Docker 的金鑰檔案
 sudo chmod a+r /etc/apt/keyrings/docker.asc
@@ -466,7 +466,6 @@ sudo usermod -aG docker $USER && newgrp docker
  
 #### Step 2：Git Clone 專案
 
-**拉取 GitHub**
 ```bash
 cd ~ && git clone https://github.com/tn00627974/rss-notify-bot
 cd rss-notify-bot
@@ -568,7 +567,6 @@ docker compose build # 只重建 image，不重啟容器（容器仍跑舊的）
 sudo systemctl restart rss-notify-bot-docker # 重啟服務
 docker compose ps # 確認容器重啟成功
 sudo journalctl -u rss-notify-bot-docker -n 50 --no-pager # 查看最新日誌
-```
 
 #### 方式 C 優勢總結
 
