@@ -44,9 +44,12 @@ RssNotityBot/
 │   └── test_batch_notifier.py      # 批量通知器測試
 │
 ├── .github/
-│   ├── copilot-instructions.md     # AI Agent 指引（本檔）
+│   ├── copilot-instructions.md     # AI Agent 指引（本檔，Copilot 與 Claude Code 共用）
 │   └── skills/
-│       └── rss-multiplatform-bot/  # Copilot skill 專用指引
+│       └── rss-multiplatform-bot/  # Copilot skill（與 .claude/skills/ 同步維護）
+├── .claude/
+│   └── skills/
+│       └── rss-multiplatform-bot/  # Claude Code skill（與 .github/skills/ 同步維護）
 │
 
 ```
@@ -242,4 +245,10 @@ asyncpg==0.30.0
 - 不修改 `seen_ids_map` 的清理邏輯（移除的訂閱只是停止推播，舊 key 留著無害）
 - 不引入 DB 連線池（每次 reload 開新連線，5 分鐘一次可接受）
 
+---
 
+## 文件同步規則
+
+本檔是 GitHub Copilot 與 Claude Code 共用的唯一真實來源：
+- 根目錄 `CLAUDE.md` 透過 `@.github/copilot-instructions.md` import 語法自動載入本檔內容，不重複維護。
+- `rss-multiplatform-bot` skill 在 `.github/skills/` 與 `.claude/skills/` 各有一份，**兩者內容必須保持一致**，修改其中一份時務必同步更新另一份。

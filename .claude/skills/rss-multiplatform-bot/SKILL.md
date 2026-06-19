@@ -4,12 +4,10 @@ description: >
   Complete domain knowledge for the multi-platform RSS notification bot (BOT2l4).
   Use for any task: adding platforms, modifying batch logic, fixing RSS feeds,
   writing tests, adjusting formatters, or deploying to Render/Docker/Oracle Cloud.
-argument-hint: 'Describe what you want to change: add platform, fix feed, update formatter, write test, or deploy.'
-user-invocable: true
 ---
 
 <!--
-此檔與 .claude/skills/rss-multiplatform-bot/SKILL.md 內容同步維護。
+此檔與 .github/skills/rss-multiplatform-bot/SKILL.md 內容同步維護。
 修改任一份時請同時更新另一份(frontmatter 依各平台規範可不同,正文內容應保持一致)。
 -->
 
@@ -126,7 +124,7 @@ One JSON `rss_url` item with N `targets[]` entries produces N `Subscription` obj
 
 ## 5. Schema (select json example + database schema)
 
-### subscriptions.json 
+### subscriptions.json
 
 ```json
 [
@@ -154,14 +152,14 @@ Supported `platform` aliases:
 
 File: [`db/schema.sql`](../../../db/schema.sql)
 
-四張核心表：
+四張核心表:
 
 | 表 | 說明 |
 |---|---|
-| `rss_source` | RSS 訂閱來源（rss_url、display_name） |
-| `platform` | 平台種類（discord、line） |
-| `target` | 推播目標（platform_id、external_id = DC頻道ID 或 LINE群組ID） |
-| `rss_source_target` | M:N 橋接表，rss_source ↔ target |
+| `rss_source` | RSS 訂閱來源(rss_url、display_name) |
+| `platform` | 平台種類(discord、line) |
+| `target` | 推播目標(platform_id、external_id = DC頻道ID 或 LINE群組ID) |
+| `rss_source_target` | M:N 橋接表,rss_source ↔ target |
 
 ---
 
