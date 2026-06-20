@@ -29,7 +29,9 @@ RssNotityBot/
 │   ├── notifiers.py       # 通知發送基底：BaseNotifier、NotificationRouter
 │   ├── batch_queue.py     # 批量隊列：數量/超時雙觸發，純邏輯無 I/O
 │   ├── batch_notifier.py  # 批量通知器：BaseBatchNotifier 及各平台子類別
-│   └── service.py         # RSS 輪詢服務：去重、分派
+│   ├── service.py         # RSS 輪詢服務：去重、分派
+│   ├── admin_repository.py # Discord 管理指令的 DB 寫入/查詢層（純 asyncpg，無 discord 依賴）
+│   └── discord_commands.py # Discord Slash Commands：/rss_add /rss_list /target_add /subscribe
 │
 ├── db/
 │   ├── schema.sql         # PostgreSQL 資料表定義
@@ -81,7 +83,9 @@ RssNotityBot/
 | `notifiers.py` | `BaseNotifier`、`NotificationRouter` |
 | `batch_queue.py` | `BatchQueue`、`BatchQueueManager`：隊列管理與雙觸發條件（數量/超時） |
 | `batch_notifier.py` | `BaseBatchNotifier`（抽象基底）、`DiscordBatchNotifier`、`LineBatchNotifier`、`FeishuBatchNotifier` |
-| `service.py` | `RssPollingService`：輪詢、去重、通知分派 |
+| `service.py` | `RssPollingService`：輪詢、去重、通知分派、`reload_now()` 供管理指令立即重載 |
+| `admin_repository.py` | DB 寫入/查詢：`insert_rss_source()`、`insert_target()`、`link_rss_target()`、`list_rss_sources()`、`list_targets()`、`get_or_create_platform_id()` |
+| `discord_commands.py` | `register_admin_commands()`：定義並註冊管理用 Slash Commands |
 
 ---
 
@@ -96,6 +100,7 @@ RssNotityBot/
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API Channel Access Token | LINE 平台必填 |
 | `FEISHU_WEBHOOK_URL` | 飛書 Webhook URL（全域預設） | 飛書平台必填 |
 | `PORT` | HTTP 健康檢查埠號，預設 `10000` | Render 必填 |
+| `DISCORD_GUILD_ID` | Slash Commands 測試用 guild ID，設定後只同步到該 guild（即時生效） | 否，留空則全域同步（約 1 小時生效） |
 
 ---
 
@@ -204,6 +209,23 @@ asyncpg==0.30.0
 
 ### 新增 RSS Feed
 只需在 `subscriptions.json` 加入新項目，無需修改程式碼。
+
+---
+
+## Discord 管理指令（Slash Commands）
+
+僅支援 `SUBSCRIPTIONS_SOURCE=pgsql` 模式（JSON 模式下指令會回覆錯誤訊息）。
+皆由 `rss_center/discord_commands.py` 的 `register_admin_commands()` 註冊，DB 存取委派給 `rss_center/admin_repository.py`。
+
+| 指令 | 權限 | 說明 |
+|---|---|---|
+| `/rss_add url name` | 需「管理伺服器」 | 新增 RSS 來源（`rss_source`） |
+| `/rss_list keyword?` | 無限制 | 查詢現有 RSS 來源（唯讀） |
+| `/target_add platform external_id? mention_user? description?` | 需「管理伺服器」 | 新增推播目標（`target`）；Discord 平台留空 `external_id` 時自動帶入目前頻道；`platform` 不存在時自動建立 |
+| `/subscribe rss_source target` | 需「管理伺服器」 | 建立 `rss_source_target` 關聯，`rss_source`/`target` 皆為 autocomplete 選單 |
+
+成功變更後會呼叫 `RssPollingService.reload_now()` 立即重載，不需等待下次 poll 週期。
+新增此類指令時請沿用同一套權限（mutating 指令一律 `app_commands.checks.has_permissions(manage_guild=True)`）與模式檢查（呼叫 `_require_pgsql_mode()`）慣例。
 
 ---
 

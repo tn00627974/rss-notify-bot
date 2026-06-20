@@ -18,6 +18,7 @@ from typing import Awaitable, Callable, Dict, List, Optional
 import aiohttp
 import discord
 from aiohttp import web
+from discord import app_commands
 from dotenv import load_dotenv
 
 from rss_center.batch_notifier import (
@@ -32,6 +33,7 @@ from rss_center.config import (
     load_subscriptions,
     load_subscriptions_from_db,
 )
+from rss_center.discord_commands import register_admin_commands
 from rss_center.notifiers import NotificationRouter
 from rss_center.service import RssPollingService
 
@@ -55,6 +57,7 @@ class SubscriptionCenterBot(discord.Client):
     ):
         super().__init__(**options)
         self.service: Optional[RssPollingService] = None
+        self.tree = app_commands.CommandTree(self)
         self._batch_notifiers: Dict[str, BaseBatchNotifier] = {}
         self.test_message = test_message
         self.test_yt = test_yt
@@ -79,9 +82,21 @@ class SubscriptionCenterBot(discord.Client):
         if self.test_message or self.test_yt or self.test_line:
             return
 
+        await self._sync_command_tree()
+
         service = self._require_service()
         await service.prime_seen_ids()
         self._poll_task = asyncio.create_task(service.poll_loop(POLL_INTERVAL_SECONDS))
+
+    async def _sync_command_tree(self) -> None:
+        """同步 Slash Commands。設定 DISCORD_GUILD_ID 時只同步到該 guild（即時生效，方便測試）。"""
+        guild_id = os.getenv("DISCORD_GUILD_ID", "").strip()
+        if guild_id:
+            guild = discord.Object(id=int(guild_id))
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+        else:
+            await self.tree.sync()  # 全域同步，套用到所有 guild 可能需要約 1 小時
 
     async def on_ready(self) -> None:
         if not self.test_message and not self.test_yt and not self.test_line:
@@ -155,6 +170,13 @@ async def _async_main(
             RssPollingService(
                 subscriptions, router, reload_fn=load_subscriptions_by_source
             )
+        )
+
+        register_admin_commands(
+            client.tree,
+            get_dsn=lambda: get_env_var("DATABASE_URL"),
+            is_pgsql_mode=lambda: data_source == "pgsql",
+            reload_now=client.service.reload_now,
         )
 
         if test_message or test_yt or test_line:

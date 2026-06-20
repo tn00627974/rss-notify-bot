@@ -120,6 +120,10 @@ class RssPollingService:
         title = getattr(entry, "title", "(no title)")
         logging.info("Posted to %s: %s", sub.platform, title)
 
+    async def reload_now(self) -> None:
+        """立即重載訂閱（供 Discord 管理指令在新增/訂閱成功後呼叫，跳過等待下次 poll 週期）。"""
+        await self._reload_subscriptions()
+
     async def _reload_subscriptions(self) -> None:
         """重新載入訂閱清單，並更新內部狀態。"""
         if self._reload_fn is None:

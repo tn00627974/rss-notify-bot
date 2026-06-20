@@ -67,7 +67,9 @@ Never use relative imports (`from .xxx`).
 | `batch_notifier.py` | `DiscordBatchNotifier` | Sends to Discord channel via `client.fetch_channel` |
 | `batch_notifier.py` | `LineBatchNotifier` | Sends to LINE via Messaging API push endpoint |
 | `batch_notifier.py` | `FeishuBatchNotifier` | Sends to Feishu/Lark via webhook URL |
-| `service.py` | `RssPollingService` | Poll feeds, deduplicate, dispatch to router |
+| `service.py` | `RssPollingService` | Poll feeds, deduplicate, dispatch to router; `reload_now()` for instant reload |
+| `admin_repository.py` | DB write/query functions | `insert_rss_source()`, `insert_target()`, `link_rss_target()`, `list_rss_sources()`, `list_targets()`, `get_or_create_platform_id()` — pure asyncpg, no discord dependency |
+| `discord_commands.py` | `register_admin_commands()` | Defines and registers the `/rss_add`, `/rss_list`, `/target_add`, `/subscribe` slash commands |
 
 ---
 
@@ -152,14 +154,14 @@ Supported `platform` aliases:
 
 File: [`db/schema.sql`](../../../db/schema.sql)
 
-四張核心表:
+四張核心表：
 
 | 表 | 說明 |
 |---|---|
-| `rss_source` | RSS 訂閱來源(rss_url、display_name) |
-| `platform` | 平台種類(discord、line) |
-| `target` | 推播目標(platform_id、external_id = DC頻道ID 或 LINE群組ID) |
-| `rss_source_target` | M:N 橋接表,rss_source ↔ target |
+| `rss_source` | RSS 訂閱來源（rss_url、display_name） |
+| `platform` | 平台種類（discord、line） |
+| `target` | 推播目標（platform_id、external_id = DC頻道ID 或 LINE群組ID） |
+| `rss_source_target` | M:N 橋接表，rss_source ↔ target |
 
 ---
 
@@ -172,6 +174,7 @@ File: [`db/schema.sql`](../../../db/schema.sql)
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE only | LINE Messaging API token |
 | `FEISHU_WEBHOOK_URL` | Feishu only | Global fallback if `webhook_url` not in JSON |
 | `PORT` | Render | Health server port, default `10000` |
+| `DISCORD_GUILD_ID` | No | Test guild for instant slash-command sync; empty = global sync (~1 hour propagation) |
 
 `get_env_var(name)` raises `RuntimeError` immediately if a required var is missing.
 
@@ -294,3 +297,33 @@ Endpoint: `GET /` and `GET /health` → `200 OK` text body `"OK"`
 | Docker local | `docker compose up` | `.env` file with all env vars |
 
 Start command for all: `python bot.py`
+
+---
+
+## 16. Discord Admin Slash Commands
+
+Registered by `rss_center/discord_commands.py`'s `register_admin_commands()`, called once
+from `bot.py` `_async_main()`. DB access is delegated to `rss_center/admin_repository.py`
+(pure asyncpg, no discord dependency, easy to unit test).
+
+| Command | Permission | Purpose |
+|---|---|---|
+| `/rss_add url name` | Manage Server | Insert into `rss_source` |
+| `/rss_list keyword?` | None (read-only) | Query `rss_source` |
+| `/target_add platform external_id? mention_user? description?` | Manage Server | Insert into `target`; Discord platform defaults `external_id` to the current channel when omitted; unknown `platform` names are auto-created in the `platform` table |
+| `/subscribe rss_source target` | Manage Server | Insert into `rss_source_target`; both parameters use autocomplete |
+
+Only works when `SUBSCRIPTIONS_SOURCE=pgsql` — each command calls `_require_pgsql_mode()` first
+and replies with an ephemeral error otherwise. After a successful mutation, commands call
+`RssPollingService.reload_now()` so the change is live immediately instead of waiting for the
+next poll cycle. Permission failures and other exceptions are handled by a single
+`tree.error` handler registered inside `register_admin_commands()`.
+
+Slash command sync happens in `SubscriptionCenterBot.setup_hook()` → `_sync_command_tree()`:
+set `DISCORD_GUILD_ID` for instant guild-scoped sync during development, leave it empty for
+global sync in production (~1 hour propagation).
+
+When adding a new admin command, follow the same conventions: mutating commands get
+`@app_commands.checks.has_permissions(manage_guild=True)`, all commands call
+`_require_pgsql_mode()` first, and DB logic belongs in `admin_repository.py`, not in the
+command function itself.
