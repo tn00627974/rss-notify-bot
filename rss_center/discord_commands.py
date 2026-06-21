@@ -9,8 +9,10 @@
 
 import logging
 from typing import Awaitable, Callable, Optional
+from urllib.parse import urlparse
 
 import discord
+import feedparser
 from discord import app_commands
 
 from .admin_repository import (
@@ -40,6 +42,18 @@ async def _require_pgsql_mode(
     return False
 
 
+def _is_valid_rss_feed(url: str) -> bool:
+    """驗證網址是否能被解析成合法的 RSS/Atom Feed。"""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    try:
+        feed = feedparser.parse(url)
+    except Exception:
+        return False
+    return bool(feed.get("version")) or bool(feed.get("entries"))
+
+
 def register_admin_commands(
     tree: app_commands.CommandTree,
     *,
@@ -47,7 +61,7 @@ def register_admin_commands(
     is_pgsql_mode: Callable[[], bool],
     reload_now: Callable[[], Awaitable[None]],
 ) -> None:
-    """將四個管理指令註冊到指定的 CommandTree。"""
+    """將 /指令 註冊到指定的 CommandTree。"""
 
     @tree.error
     async def on_admin_command_error(
@@ -70,7 +84,10 @@ def register_admin_commands(
     async def rss_add(interaction: discord.Interaction, url: str, name: str) -> None:
         if not await _require_pgsql_mode(interaction, is_pgsql_mode):
             return
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True) # 延遲回覆，避免 Discord 3 秒超時
+        if not _is_valid_rss_feed(url):
+            await interaction.followup.send("❌ RSS 網址驗證失敗，請確認網址是否為合法的 RSS/Atom Feed", ephemeral=True)
+            return
         try:
             new_id = await insert_rss_source(get_dsn(), url, name)
         except Exception as exc:
