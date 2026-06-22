@@ -91,10 +91,16 @@ class SubscriptionCenterBot(discord.Client):
     async def _sync_command_tree(self) -> None:
         """同步 Slash Commands。設定 DISCORD_GUILD_ID 時只同步到該 guild（即時生效，方便測試）。"""
         guild_id = os.getenv("DISCORD_GUILD_ID", "").strip()
-        if guild_id:
+        if guild_id: # 有填寫 DISCORD_GUILD_ID，只會同步指定的伺服器，適合開發測試
+            logging.info("Syncing command tree to guild %s", guild_id)
             guild = discord.Object(id=int(guild_id))
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
+
+            self.tree.copy_global_to(guild=guild)  # 必須先複製（用到本地全域指令），再清空全域、同步到 guild
+            synced = await self.tree.sync(guild=guild)
+            logging.info("Synced %d commands to guild %s: %s", len(synced), guild_id, [c.name for c in synced])
+
+            self.tree.clear_commands(guild=None)  # 開發模式下清空全域指令，避免跟 guild 指令重複顯示
+            await self.tree.sync()
         else:
             await self.tree.sync()  # 全域同步，套用到所有 guild 可能需要約 1 小時
 

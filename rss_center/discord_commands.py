@@ -124,6 +124,8 @@ def register_admin_commands(
             f"#{r['id']} {'✅' if r['is_active'] else '⏸️'} {r['display_name']} — {r['rss_url']}"
             for r in rows
         ]
+
+        lines.append(f"目前儲存共 {len(lines)} 筆RSS來源")
         text = "\n".join(lines)
         if len(text) > 1900:
             text = text[:1900] + "\n…（已截斷，請用 keyword 縮小範圍）"
