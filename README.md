@@ -8,8 +8,6 @@
 多平台 RSS 訂閱推播 Bot，支援 **Discord、LINE、飛書（Feishu）** 三大平台。
 每 5 分鐘自動輪詢 RSS Feed（Yahoo 台股、YouTube 等），偵測新文章後推播到指定頻道，以 ID 去重避免重複推播。
 
-![](/assets/Rss-bot-preview-1.jpg)
-
 ---
 
 ## 目錄
